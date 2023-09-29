@@ -11,10 +11,11 @@ import Control.Monad.Except (
     MonadError,
     MonadIO,
     liftEither,
+    liftIO,
     runExceptT,
     throwError,
  )
-import Control.Monad.Reader (MonadReader, ReaderT, runReaderT)
+import Control.Monad.Reader (MonadReader, ReaderT, asks, runReaderT)
 import Data.Bifunctor (first)
 import Data.ByteString.Char8 qualified as BSC
 import Data.Maybe (fromJust, fromMaybe)
@@ -36,12 +37,15 @@ import Options.Applicative (
     (<**>),
  )
 import Parse (ParseError, parseHttpReq)
+import System.Directory (doesFileExist)
+import System.FilePath ((</>))
 import Types (
     HttpRequest (..),
     HttpResponse (..),
     StatusCode (..),
     emptyResWithStatus,
     getHeader,
+    mkOkFileRes,
     mkOkRes,
     responseToStr,
  )
@@ -76,9 +80,12 @@ handleClient socket = do
                 | path == "/" -> pure ok200
                 | "/echo/" `BSC.isPrefixOf` path -> pure $ extractPath parsedReq
                 | path == "/user-agent" -> pure $ extractHeader parsedReq
+                | "/files/" `BSC.isPrefixOf` path -> getFile parsedReq
                 | otherwise -> pure notFound404
     _ <- send socket (responseToStr response)
     pure ()
+
+-- Handlers
 
 ok200 :: HttpResponse
 ok200 = emptyResWithStatus Ok
@@ -93,6 +100,20 @@ extractPath HttpRequest{..} =
 extractHeader :: HttpRequest -> HttpResponse
 extractHeader req =
     mkOkRes (fromMaybe "" $ getHeader req "User-Agent")
+
+getFile :: HttpRequest -> HttpServer HttpResponse
+getFile HttpRequest{..} = do
+    let filename = fromJust $ BSC.stripPrefix "/files/" path
+    dir <- asks directory
+    let filePath = dir </> BSC.unpack filename
+    isFilePresent <- liftIO $ doesFileExist filePath
+    if isFilePresent
+        then do
+            content <- liftIO $ BSC.readFile filePath
+            pure $ mkOkFileRes content
+        else pure notFound404
+
+-- CLI options parsing
 
 newtype CliOpts = CliOpts
     { maybeDir :: Maybe String
@@ -115,6 +136,8 @@ cliOpts = info (environment <**> helper) desc
         fullDesc
             <> progDesc "A basic HTTP Server"
             <> header "hs-http-server-clone - a barebones HTTP server written for fun"
+
+-- Main
 
 main :: IO ()
 main = do

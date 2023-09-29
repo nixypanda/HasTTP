@@ -10,6 +10,7 @@ module Types (
     responseToStr,
     emptyResWithStatus,
     mkOkRes,
+    mkOkFileRes,
     getHeader,
 ) where
 
@@ -66,3 +67,9 @@ mkOkRes content = HttpResponse Ok [contentType, contentLength] content
 
 getHeader :: HttpRequest -> BS.ByteString -> Maybe BS.ByteString
 getHeader req header = value <$> find ((== header) . name) (reqHeaders req)
+
+mkOkFileRes :: BS.ByteString -> HttpResponse
+mkOkFileRes content = HttpResponse Ok [contentType, contentLength] content
+  where
+    contentLength = HttpHeader "Content-Length" (BSC.pack . show $ BS.length content)
+    contentType = HttpHeader "Content-Type" "application/octet-stream"
