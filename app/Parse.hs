@@ -4,6 +4,7 @@
 
 module Parse (ParseError, parseHttpReq) where
 
+import Control.Applicative ((<|>))
 import Control.Monad (void)
 import Data.Attoparsec.ByteString (
     Parser,
@@ -11,6 +12,7 @@ import Data.Attoparsec.ByteString (
     parseOnly,
     sepBy,
     string,
+    takeByteString,
     takeWhile1,
  )
 import Data.Attoparsec.ByteString.Char8 (space)
@@ -32,10 +34,11 @@ httpRequest = do
     reqHeaders <- option [] $ sepBy httpHeader crlf
     crlf
     crlf
+    reqContent <- option "" takeByteString
     return $ HttpRequest{..}
 
 httpMethod :: Parser HttpMethod
-httpMethod = string "GET" $> GET
+httpMethod = string "GET" $> GET <|> string "POST" $> POST
 
 httpPath :: Parser BS.ByteString
 httpPath = takeWhile1 (not . isSpace)

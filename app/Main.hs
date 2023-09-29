@@ -40,6 +40,7 @@ import Parse (ParseError, parseHttpReq)
 import System.Directory (doesFileExist)
 import System.FilePath ((</>))
 import Types (
+    HttpMethod (..),
     HttpRequest (..),
     HttpResponse (..),
     StatusCode (..),
@@ -80,7 +81,8 @@ handleClient socket = do
                 | path == "/" -> pure ok200
                 | "/echo/" `BSC.isPrefixOf` path -> pure $ extractPath parsedReq
                 | path == "/user-agent" -> pure $ extractHeader parsedReq
-                | "/files/" `BSC.isPrefixOf` path -> getFile parsedReq
+                | "/files/" `BSC.isPrefixOf` path && method == GET -> getFile parsedReq
+                | "/files/" `BSC.isPrefixOf` path && method == POST -> storeFile parsedReq
                 | otherwise -> pure notFound404
     _ <- send socket (responseToStr response)
     pure ()
@@ -92,6 +94,9 @@ ok200 = emptyResWithStatus Ok
 
 notFound404 :: HttpResponse
 notFound404 = emptyResWithStatus NotFound
+
+created201 :: HttpResponse
+created201 = emptyResWithStatus Created
 
 extractPath :: HttpRequest -> HttpResponse
 extractPath HttpRequest{..} =
@@ -112,6 +117,14 @@ getFile HttpRequest{..} = do
             content <- liftIO $ BSC.readFile filePath
             pure $ mkOkFileRes content
         else pure notFound404
+
+storeFile :: HttpRequest -> HttpServer HttpResponse
+storeFile HttpRequest{..} = do
+    let filename = fromJust $ BSC.stripPrefix "/files/" path
+    dir <- asks directory
+    let filePath = dir </> BSC.unpack filename
+    liftIO $ BSC.writeFile filePath reqContent
+    pure created201
 
 -- CLI options parsing
 

@@ -27,10 +27,11 @@ data HttpHeader = HttpHeader
 httpHeaderStr :: HttpHeader -> BS.ByteString
 httpHeaderStr (HttpHeader n v) = BS.concat [n, ": ", v]
 
-data StatusCode = Ok | NotFound deriving (Show)
+data StatusCode = Ok | Created | NotFound deriving (Show)
 
 statusCodeStr :: StatusCode -> BS.ByteString
 statusCodeStr Ok = "200 OK"
+statusCodeStr Created = "201 Created"
 statusCodeStr NotFound = "404 Not Found"
 
 data HttpResponse = HttpResponse
@@ -47,13 +48,14 @@ responseToStr response =
         contentStr = resContent response
      in BSC.unlines [statusLine, headersStr, "", contentStr]
 
-data HttpMethod = GET deriving (Eq)
+data HttpMethod = GET | POST deriving (Eq)
 
 data HttpRequest = HttpRequest
     { method :: HttpMethod
     , path :: BS.ByteString
     , version :: BS.ByteString
     , reqHeaders :: [HttpHeader]
+    , reqContent :: BS.ByteString
     }
 
 emptyResWithStatus :: StatusCode -> HttpResponse
