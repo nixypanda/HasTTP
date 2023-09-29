@@ -16,7 +16,7 @@ import Control.Monad.Except (
  )
 import Data.Bifunctor (first)
 import Data.ByteString.Char8 qualified as BSC
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, fromMaybe)
 import Network.Simple.TCP (HostPreference (Host), Socket, recv, send, serve)
 import Parse (ParseError, parseHttpReq)
 import Types (
@@ -24,6 +24,7 @@ import Types (
     HttpResponse (..),
     StatusCode (..),
     emptyResWithStatus,
+    getHeader,
     mkOkRes,
     responseToStr,
  )
@@ -54,6 +55,7 @@ handleClient socket = do
         if
                 | path == "/" -> pure ok200
                 | "/echo/" `BSC.isPrefixOf` path -> pure $ extractPath parsedReq
+                | path == "/user-agent" -> pure $ extractHeader parsedReq
                 | otherwise -> pure notFound404
     _ <- send socket (responseToStr response)
     pure ()
@@ -67,6 +69,10 @@ notFound404 = emptyResWithStatus NotFound
 extractPath :: HttpRequest -> HttpResponse
 extractPath HttpRequest{..} =
     mkOkRes (fromJust $ BSC.stripPrefix "/echo/" path)
+
+extractHeader :: HttpRequest -> HttpResponse
+extractHeader req =
+    mkOkRes (fromMaybe "" $ getHeader req "User-Agent")
 
 main :: IO ()
 main = do

@@ -10,10 +10,12 @@ module Types (
     responseToStr,
     emptyResWithStatus,
     mkOkRes,
+    getHeader,
 ) where
 
 import Data.ByteString qualified as BS
 import Data.ByteString.Char8 qualified as BSC
+import Data.List (find)
 
 data HttpHeader = HttpHeader
     { name :: BS.ByteString
@@ -50,6 +52,7 @@ data HttpRequest = HttpRequest
     { method :: HttpMethod
     , path :: BS.ByteString
     , version :: BS.ByteString
+    , reqHeaders :: [HttpHeader]
     }
 
 emptyResWithStatus :: StatusCode -> HttpResponse
@@ -60,3 +63,6 @@ mkOkRes content = HttpResponse Ok [contentType, contentLength] content
   where
     contentLength = HttpHeader "Content-Length" (BSC.pack . show $ BS.length content)
     contentType = HttpHeader "Content-Type" "text/plain"
+
+getHeader :: HttpRequest -> BS.ByteString -> Maybe BS.ByteString
+getHeader req header = value <$> find ((== header) . name) (reqHeaders req)

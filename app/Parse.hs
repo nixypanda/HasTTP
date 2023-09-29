@@ -7,15 +7,17 @@ module Parse (ParseError, parseHttpReq) where
 import Control.Monad (void)
 import Data.Attoparsec.ByteString (
     Parser,
+    option,
     parseOnly,
+    sepBy,
     string,
     takeWhile1,
  )
 import Data.Attoparsec.ByteString.Char8 (space)
 import Data.ByteString qualified as BS
 import Data.Functor (($>))
-import Data.Word8 (isSpace)
-import Types (HttpMethod (..), HttpRequest (..))
+import Data.Word8 (isSpace, _colon, _cr)
+import Types (HttpHeader (..), HttpMethod (..), HttpRequest (..))
 
 type ParseError = String
 
@@ -27,6 +29,9 @@ httpRequest = do
     _ <- space
     version <- httpVersion
     crlf
+    reqHeaders <- option [] $ sepBy httpHeader crlf
+    crlf
+    crlf
     return $ HttpRequest{..}
 
 httpMethod :: Parser HttpMethod
@@ -37,6 +42,14 @@ httpPath = takeWhile1 (not . isSpace)
 
 httpVersion :: Parser BS.ByteString
 httpVersion = string "HTTP/1.1"
+
+httpHeader :: Parser HttpHeader
+httpHeader = do
+    name <- takeWhile1 (/= _colon)
+    _ <- string ":"
+    _ <- space
+    value <- takeWhile1 (/= _cr)
+    return $ HttpHeader name value
 
 crlf :: Parser ()
 crlf = void (string "\r\n")
