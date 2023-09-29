@@ -1,18 +1,35 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Main (main) where
 
-import Control.Monad.Except (ExceptT, MonadError, MonadIO, runExceptT, throwError)
+import Control.Monad.Except (
+    ExceptT,
+    MonadError,
+    MonadIO,
+    liftEither,
+    runExceptT,
+    throwError,
+ )
+import Data.Bifunctor (first)
 import Data.ByteString.Char8 qualified as BSC
 import Network.Simple.TCP (HostPreference (Host), Socket, recv, send, serve)
-import Types (HttpResponse (..), StatusCode (..), responseToStr)
+import Parse (ParseError, parseHttpReq)
+import Types (
+    HttpRequest (..),
+    HttpResponse (..),
+    StatusCode (..),
+    emptyResWithStatus,
+    responseToStr,
+ )
 
 bufferSize :: Int
 bufferSize = 4096
 
-data HttpServerError = EmptyRequest
+data HttpServerError = EmptyRequest | MalformedReq ParseError
     deriving (Show)
 
 newtype HttpServer a = HttpServer
@@ -29,19 +46,20 @@ newtype HttpServer a = HttpServer
 handleClient :: Socket -> HttpServer ()
 handleClient socket = do
     maybeRawReq <- recv socket bufferSize
-    _ <- maybe (throwError EmptyRequest) pure maybeRawReq
-    let response = ok200
-
+    rawReq <- maybe (throwError EmptyRequest) pure maybeRawReq
+    HttpRequest{..} <- liftEither $ first MalformedReq $ parseHttpReq rawReq
+    response <-
+        if
+                | path == "/" -> pure ok200
+                | otherwise -> pure notFound404
     _ <- send socket (responseToStr response)
     pure ()
 
 ok200 :: HttpResponse
-ok200 =
-    HttpResponse
-        { statusCode = Ok
-        , resHeaders = []
-        , resContent = "OK"
-        }
+ok200 = emptyResWithStatus Ok
+
+notFound404 :: HttpResponse
+notFound404 = emptyResWithStatus NotFound
 
 main :: IO ()
 main = do

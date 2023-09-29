@@ -5,7 +5,10 @@ module Types (
     HttpHeader (..),
     StatusCode (..),
     HttpResponse (..),
+    HttpRequest (..),
+    HttpMethod (..),
     responseToStr,
+    emptyResWithStatus,
 ) where
 
 import Data.ByteString qualified as BS
@@ -20,11 +23,10 @@ data HttpHeader = HttpHeader
 httpHeaderStr :: HttpHeader -> BS.ByteString
 httpHeaderStr (HttpHeader n v) = BS.concat [n, ": ", v]
 
-data StatusCode = Ok | Created | NotFound deriving (Show)
+data StatusCode = Ok | NotFound deriving (Show)
 
 statusCodeStr :: StatusCode -> BS.ByteString
 statusCodeStr Ok = "200 OK"
-statusCodeStr Created = "201 Created"
 statusCodeStr NotFound = "404 Not Found"
 
 data HttpResponse = HttpResponse
@@ -40,3 +42,14 @@ responseToStr response =
         headersStr = BS.intercalate "\r\n" (map httpHeaderStr $ resHeaders response)
         contentStr = resContent response
      in BSC.unlines [statusLine, headersStr, "", contentStr]
+
+data HttpMethod = GET deriving (Eq)
+
+data HttpRequest = HttpRequest
+    { method :: HttpMethod
+    , path :: BS.ByteString
+    , version :: BS.ByteString
+    }
+
+emptyResWithStatus :: StatusCode -> HttpResponse
+emptyResWithStatus s = HttpResponse s [] ""
