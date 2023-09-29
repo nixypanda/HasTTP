@@ -9,6 +9,7 @@ module Types (
     HttpMethod (..),
     responseToStr,
     emptyResWithStatus,
+    mkOkRes,
 ) where
 
 import Data.ByteString qualified as BS
@@ -53,3 +54,9 @@ data HttpRequest = HttpRequest
 
 emptyResWithStatus :: StatusCode -> HttpResponse
 emptyResWithStatus s = HttpResponse s [] ""
+
+mkOkRes :: BS.ByteString -> HttpResponse
+mkOkRes content = HttpResponse Ok [contentType, contentLength] content
+  where
+    contentLength = HttpHeader "Content-Length" (BSC.pack . show $ BS.length content)
+    contentType = HttpHeader "Content-Type" "text/plain"

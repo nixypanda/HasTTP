@@ -16,6 +16,7 @@ import Control.Monad.Except (
  )
 import Data.Bifunctor (first)
 import Data.ByteString.Char8 qualified as BSC
+import Data.Maybe (fromJust)
 import Network.Simple.TCP (HostPreference (Host), Socket, recv, send, serve)
 import Parse (ParseError, parseHttpReq)
 import Types (
@@ -23,6 +24,7 @@ import Types (
     HttpResponse (..),
     StatusCode (..),
     emptyResWithStatus,
+    mkOkRes,
     responseToStr,
  )
 
@@ -47,10 +49,11 @@ handleClient :: Socket -> HttpServer ()
 handleClient socket = do
     maybeRawReq <- recv socket bufferSize
     rawReq <- maybe (throwError EmptyRequest) pure maybeRawReq
-    HttpRequest{..} <- liftEither $ first MalformedReq $ parseHttpReq rawReq
+    parsedReq@HttpRequest{..} <- liftEither $ first MalformedReq $ parseHttpReq rawReq
     response <-
         if
                 | path == "/" -> pure ok200
+                | "/echo/" `BSC.isPrefixOf` path -> pure $ extractPath parsedReq
                 | otherwise -> pure notFound404
     _ <- send socket (responseToStr response)
     pure ()
@@ -60,6 +63,10 @@ ok200 = emptyResWithStatus Ok
 
 notFound404 :: HttpResponse
 notFound404 = emptyResWithStatus NotFound
+
+extractPath :: HttpRequest -> HttpResponse
+extractPath HttpRequest{..} =
+    mkOkRes (fromJust $ BSC.stripPrefix "/echo/" path)
 
 main :: IO ()
 main = do
