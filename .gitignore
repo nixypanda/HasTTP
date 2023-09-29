@@ -1,3 +1,5 @@
 .stack-work/
-hs-redis-clone.cabal
+hs-http-server-clone.cabal
+.direnv/
+tags
 *~
